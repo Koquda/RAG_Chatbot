@@ -13,26 +13,26 @@ from langchain_core.prompts import MessagesPlaceholder
 from langchain_core.messages import AIMessage, HumanMessage, BaseMessage
 
 SYSTEM_PROMPT = """
-You're having a conversation with an user about excerpts of their files. Try to be helpful and answer their questions.
-If you don't know the answer, say that you don't lknow and try to ask clarifying questions.
+Estás teniendo una conversación con un usuario sobre fragmentos de sus archivos. Intenta ser útil y responder a sus preguntas.
+Si no sabes la respuesta, di que no lo sabes e intenta hacer preguntas aclaratorias.
 """.strip()
 
 PROMPT = """
-Here's the information you have about the excerpts of the files:
+Esta es la información que tienes sobre los fragmentos de los documentos:
 
 <context>
 {context}
 </context>
 
-One file can have multiple excerpts.
+Un documento puede tener varios fragmentos.
 
-Please, respond to the query below
+Por favor, responde a la siguiente pregunta:
 
 <question>
 {question}
 </question>
 
-Answer:
+Respuesta:
 """
 
 FILE_TEMPLATE = """
