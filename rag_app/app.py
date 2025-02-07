@@ -32,6 +32,10 @@ st.header("ASAC Chatbot")
 
 @st.cache_resource(show_spinner=False)
 def create_chatbot(files: List[UploadedFile]):
+    # If there are no files, return the Chatbot using the current index
+    if not files or len(files) == 0:
+        return Chatbot([])
+
     # Load the files before creating the Chatbot
     files = [load_uploaded_file(file) for file in files]
     return Chatbot(files)
@@ -41,13 +45,13 @@ def create_chatbot(files: List[UploadedFile]):
 if "show_file_uploader" not in st.session_state:
     st.session_state.show_file_uploader = False
 if "uploaded_files" not in st.session_state:
-    st.session_state.uploaded_files = None
+    st.session_state.uploaded_files = []
 
 def process_uploaded_files():
     """
     Process the uploaded files and create the chatbot.
     """
-    if st.session_state.uploaded_files is None:
+    if not st.session_state.uploaded_files:
         st.warning("Por favor, sube tus documentos antes de continuar.")
         st.stop()
     
@@ -68,8 +72,11 @@ with cols[1]:
     if st.button("Subir archivos"):
         st.session_state.show_file_uploader = True
 
-# If the uploader should be shown, display it right below the chat input.
-if st.session_state.show_file_uploader:
+# Create the chatbot instance
+chatbot = create_chatbot([])
+
+# Show the file uploader only if the uploader flag is set and no files have been uploaded yet.
+if st.session_state.show_file_uploader and not st.session_state.uploaded_files:
     st.markdown("### Sube tus documentos")
     # The file uploader widget; note that it accepts multiple files.
     uploaded_files = st.file_uploader(
@@ -78,20 +85,11 @@ if st.session_state.show_file_uploader:
         accept_multiple_files=True,
         key="uploader"
     )
+    # As soon as files are selected, add them to session state and hide the uploader.
     if uploaded_files:
-        if st.session_state.uploaded_files is None:
-            st.session_state.uploaded_files = []
         st.session_state.uploaded_files.extend(uploaded_files)
-        # Optionally, once files are uploaded, you might want to hide the uploader again:
         st.session_state.show_file_uploader = False
-
-# Before processing chat messages, ensure that files have been uploaded.
-if st.session_state.uploaded_files is None:
-    st.info("Por favor, sube tus documentos usando el botón de la derecha para comenzar.")
-    st.stop()
-
-# Create the chatbot once files have been uploaded.
-chatbot = process_uploaded_files()
+        chatbot = process_uploaded_files()
 
 # --- Chat history and sidebar ---
 if "messages" not in st.session_state:

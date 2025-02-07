@@ -19,9 +19,10 @@ class Config:
         CONTEXTUALIZE_CHUNKS = True
         N_SEMANTIC_RESULTS = 5
         N_BM25_RESULTS = 5
+        FAISS_INDEX_PATH = Path("index")
 
     class Chatbot:
-        N_CONTEXT_RESULTS = 3
+        N_CONTEXT_RESULTS = 5
     
     class Path:
         APP_HOME = Path(os.getenv("APP_HOME", Path(__file__).parent.parent))

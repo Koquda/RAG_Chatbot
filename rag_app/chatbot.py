@@ -3,7 +3,7 @@ from enum import Enum
 from langchain.prompts import ChatPromptTemplate
 from typing import Iterable, List, TypedDict
 from rag_app.config import Config
-from rag_app.data_ingestor import ingest_files
+from rag_app.data_ingestor import ingest_files, create_retriever
 from rag_app.file_loader import File
 from langchain_ollama import ChatOllama
 from langchain_core.documents import Document
@@ -91,8 +91,10 @@ def create_history(welcome_message: str) -> List[Message]:
 
 class Chatbot:
     def __init__(self, files: List[File]):
+        print("Creating chatbot")
         self.files = files
-        self.retriever = ingest_files(files)
+        self.retriever = create_retriever()
+        self.ingest = ingest_files(files)
         self.llm = ChatOllama(
             model=Config.Model.NAME,
             temperature=Config.Model.TEMPERATURE,
