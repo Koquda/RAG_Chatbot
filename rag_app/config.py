@@ -7,7 +7,7 @@ class Config:
     ALLOWED_FILE_EXTENSIONS = set(['.pdf', '.md', '.txt'])
 
     class Model:
-        NAME = "deepseek-r1:14b"
+        NAME = "deepseek-r1"
         TEMPERATURE = 0.6
 
     class Preprocessing:
@@ -26,3 +26,7 @@ class Config:
     
     class Path:
         APP_HOME = Path(os.getenv("APP_HOME", Path(__file__).parent.parent))
+
+    class Database:
+        COLLECTION_NAME = "documents"
+        CLUSTER_URL = "https://dccbf4cf-85a8-48a9-9a9b-36edad0751d1.europe-west3-0.gcp.cloud.qdrant.io:6333"

@@ -1,20 +1,21 @@
 import os
 from typing import List
+from uuid import uuid4
 
+from qdrant_client import QdrantClient, models
 from langchain.prompts import ChatPromptTemplate
-from langchain.retrievers import ContextualCompressionRetriever, EnsembleRetriever
 from langchain.retrievers.document_compressors.flashrank_rerank import FlashrankRerank
 from langchain_community.embeddings.fastembed import FastEmbedEmbeddings
-from langchain_community.retrievers import BM25Retriever
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
-from langchain_community.vectorstores.faiss import FAISS
+from langchain_qdrant import QdrantVectorStore
 from langchain_ollama import ChatOllama
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from rag_app.config import Config
 from rag_app.file_loader import File
 
+# TODO: cambiar para proporcionar varios documentos como contexto??
 CONTEXT_PROMPT = ChatPromptTemplate.from_template(
     """
     Eres un experto en pliegos. Tu tarea es que respondas a las preguntas que se te hagan utilizando el contexto relevante de cada chunk
@@ -45,26 +46,6 @@ def create_embeddings() -> FastEmbedEmbeddings:
 def create_reranker() -> FlashrankRerank:
     return FlashrankRerank(model=Config.Preprocessing.RERANKER, top_n=Config.Chatbot.N_CONTEXT_RESULTS)
 
-def load_or_create_database():
-    print("Loading or creating database...")
-    index_dir = Config.Preprocessing.FAISS_INDEX_PATH
-
-    # Check if a persisted FAISS index already exists.
-    if os.path.exists(index_dir):
-        print(f"Loading FAISS index from {index_dir}")
-        faiss_index = FAISS.load_local(index_dir, create_embeddings(), allow_dangerous_deserialization=True)
-        print(f"FAISS index loaded from {index_dir}")
-    else:
-        print("Creating a new FAISS index")
-        faiss_index = FAISS.from_documents([Document.construct(page_content="First document", metadata={"source": "default"})], create_embeddings())
-        faiss_index.save_local(index_dir)
-        print(f"FAISS index saved to {index_dir}")
-
-    return faiss_index
-
-# Initialize the FAISS index
-faiss_vector_store = load_or_create_database()
-
 def _generate_context(llm: ChatOllama, document: str, chunk: str) -> str:
     messages = CONTEXT_PROMPT.format_messages(document=document, chunk=chunk)
     response = llm.invoke(messages)
@@ -89,10 +70,11 @@ def ingest_files(files: List[File]) -> BaseRetriever:
         chunks = []
         for document in documents:
             chunks.extend(_create_chunks(document))
+        uuids = [str(uuid4()) for _ in range(len(documents))]
 
-        print("Adding chunks to FAISS index...")
-        faiss_vector_store.add_documents(chunks)
-        print("Chunks added to FAISS index")
+        print("Adding chunks to Qdrant collection...")
+        vector_store.add_documents(documents=chunks, ids=uuids)
+        print("Chunks added to Qdrant collection")
 
     """
     if files:
@@ -122,12 +104,28 @@ def ingest_files(files: List[File]) -> BaseRetriever:
     )
     """
 
-def create_retriever() -> BaseRetriever:
-    print("Creating retriever without new files")
-    retriever = faiss_vector_store.as_retriever(
-        search_kwargs={"k": Config.Preprocessing.N_SEMANTIC_RESULTS}
-    )
-    return ContextualCompressionRetriever(
-            base_compressor=create_reranker(), base_retriever=retriever
+print("Authenticating into qdrant")
+qdrant_client = QdrantClient(
+    "https://dccbf4cf-85a8-48a9-9a9b-36edad0751d1.europe-west3-0.gcp.cloud.qdrant.io:6333",
+    api_key="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIiwiZXhwIjoxNzQ2NjkyMDE5fQ.lcSfk1W2EOThyflEg1q6WJMWck7eAvlV5q7MrD-YVfM")
+print("User authenticated to qdrant cluster")
+
+# Create the collection if it does not exist
+collection = qdrant_client.collection_exists(Config.Database.COLLECTION_NAME)
+if not collection:
+    qdrant_client.create_collection(
+        collection_name=Config.Database.COLLECTION_NAME,
+        vectors_config=models.VectorParams(size=384, distance=models.Distance.COSINE)
     )
 
+vector_store = QdrantVectorStore(
+    client=qdrant_client,
+    embedding=create_embeddings(),
+    collection_name=Config.Database.COLLECTION_NAME,
+)
+
+def create_retriever() -> BaseRetriever:
+    print("Creating retriever without new files")
+    return vector_store.as_retriever(
+        search_kwargs={"k": Config.Preprocessing.N_SEMANTIC_RESULTS}
+    )
